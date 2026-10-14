@@ -116,9 +116,7 @@ func main() {
 
 	// Initialize unified transcription processor
 	logger.Startup("transcription", "Initializing transcription service")
-	// Initialize unified transcription processor
-	logger.Startup("transcription", "Initializing transcription service")
-	unifiedProcessor := transcription.NewUnifiedJobProcessor(jobRepo)
+	unifiedProcessor := transcription.NewUnifiedJobProcessor(jobRepo, cfg.TempDir, cfg.TranscriptsDir)
 	unifiedProcessor.GetUnifiedService().SetBroadcaster(broadcaster)
 
 	// Bootstrap embedded Python environment (for all adapters)
@@ -227,6 +225,9 @@ func registerAdapters(cfg *config.Config) {
 	// Dedicated environment path for PyAnnote (to avoid dependency conflicts)
 	pyannoteEnvPath := filepath.Join(cfg.WhisperXEnv, "pyannote")
 
+	// Dedicated environment path for Voxtral (Mistral AI model)
+	voxtralEnvPath := filepath.Join(cfg.WhisperXEnv, "voxtral")
+
 	// Register transcription adapters
 	registry.RegisterTranscriptionAdapter("whisperx",
 		adapters.NewWhisperXAdapter(cfg.WhisperXEnv))
@@ -234,6 +235,8 @@ func registerAdapters(cfg *config.Config) {
 		adapters.NewParakeetAdapter(nvidiaEnvPath))
 	registry.RegisterTranscriptionAdapter("canary",
 		adapters.NewCanaryAdapter(nvidiaEnvPath)) // Shares with Parakeet
+	registry.RegisterTranscriptionAdapter("voxtral",
+		adapters.NewVoxtralAdapter(voxtralEnvPath))
 	registry.RegisterTranscriptionAdapter("openai_whisper",
 		adapters.NewOpenAIAdapter(cfg.OpenAIAPIKey))
 

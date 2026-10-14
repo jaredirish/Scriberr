@@ -80,7 +80,7 @@ func NewSortformerAdapter(envPath string) *SortformerAdapter {
 			Name:        "output_format",
 			Type:        "string",
 			Required:    false,
-			Default:     "rttm",
+			Default:     OutputFormatJSON,
 			Options:     []string{"rttm", OutputFormatJSON},
 			Description: "Output format for diarization results",
 			Group:       "advanced",
@@ -263,6 +263,11 @@ func (s *SortformerAdapter) downloadSortformerModel() error {
 
 // copyDiarizationScript creates the Python script for Sortformer diarization
 func (s *SortformerAdapter) copyDiarizationScript() error {
+	// Ensure directory exists before writing script
+	if err := os.MkdirAll(s.envPath, 0755); err != nil {
+		return fmt.Errorf("failed to create directory: %w", err)
+	}
+
 	scriptContent, err := nvidiaScripts.ReadFile("py/nvidia/sortformer_diarize.py")
 	if err != nil {
 		return fmt.Errorf("failed to read embedded sortformer_diarize.py: %w", err)

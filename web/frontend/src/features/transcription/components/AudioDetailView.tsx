@@ -189,8 +189,10 @@ export const AudioDetailView = function AudioDetailView({ audioId: propAudioId }
                                 <Header />
                             </div>
                             <div className="space-y-6 sm:space-y-8">
-                                {/* Title & Metadata */}
-                                <div className="space-y-4">
+                                {/* Sticky header: Title + Audio Player */}
+                                <div className="sticky top-0 z-10">
+                                    {/* Title & Metadata */}
+                                    <div className="space-y-4 glass-card rounded-[var(--radius-card)] border-[var(--border-subtle)] shadow-[var(--shadow-card)] p-4 md:p-6 mb-4">
                                     <div className="flex items-start justify-between gap-4">
                                         <div className="space-y-3 flex-1 min-w-0">
                                             {/* Title Edit Logic */}
@@ -295,10 +297,18 @@ export const AudioDetailView = function AudioDetailView({ audioId: propAudioId }
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end" className="w-56 glass-card rounded-[var(--radius-card)] shadow-[var(--shadow-float)] border-[var(--border-subtle)] p-1.5">
                                                     {/* ... (Menu Items same as before, update handlers) ... */}
-                                                    <DropdownMenuItem onClick={() => setTranscriptMode(transcriptMode === 'compact' ? 'expanded' : 'compact')} className="rounded-[8px] cursor-pointer">
-                                                        {transcriptMode === 'compact' ? <List className="mr-2 h-4 w-4 opacity-70" /> : <AlignLeft className="mr-2 h-4 w-4 opacity-70" />}
-                                                        {transcriptMode === 'compact' ? 'Timeline View' : 'Compact View'}
-                                                    </DropdownMenuItem>
+                                                    {/* Only show timeline view toggle if transcript has word-level timestamps */}
+                                                    {transcript?.word_segments && transcript.word_segments.length > 0 ? (
+                                                        <DropdownMenuItem onClick={() => setTranscriptMode(transcriptMode === 'compact' ? 'expanded' : 'compact')} className="rounded-[8px] cursor-pointer">
+                                                            {transcriptMode === 'compact' ? <List className="mr-2 h-4 w-4 opacity-70" /> : <AlignLeft className="mr-2 h-4 w-4 opacity-70" />}
+                                                            {transcriptMode === 'compact' ? 'Timeline View' : 'Compact View'}
+                                                        </DropdownMenuItem>
+                                                    ) : (
+                                                        <DropdownMenuItem disabled className="rounded-[8px] opacity-50 cursor-not-allowed">
+                                                            <List className="mr-2 h-4 w-4 opacity-70" />
+                                                            Timeline View (No timestamps)
+                                                        </DropdownMenuItem>
+                                                    )}
                                                     <DropdownMenuItem onClick={() => setAutoScrollEnabled(!autoScrollEnabled)} className="rounded-[8px] cursor-pointer">
                                                         <ArrowDownCircle className={cn("mr-2 h-4 w-4 opacity-70", autoScrollEnabled && "text-[var(--brand-solid)]")} />
                                                         Auto Scroll {autoScrollEnabled ? 'On' : 'Off'}
@@ -344,14 +354,15 @@ export const AudioDetailView = function AudioDetailView({ audioId: propAudioId }
                                     </div>
                                 </div>
 
-                                {/* Audio Player */}
-                                <div className="sticky top-0 z-10 glass-card rounded-[var(--radius-card)] border-[var(--border-subtle)] shadow-[var(--shadow-card)] p-4 md:p-6 mb-8 transition-all duration-300 hover:shadow-[var(--shadow-float)]">
-                                    <EmberPlayer
-                                        ref={audioPlayerRef}
-                                        audioId={audioId}
-                                        onTimeUpdate={handleTimeUpdate}
-                                        onPlayStateChange={setIsPlaying}
-                                    />
+                                    {/* Audio Player */}
+                                    <div className="glass-card rounded-[var(--radius-card)] border-[var(--border-subtle)] shadow-[var(--shadow-card)] p-4 md:p-6 mb-8 transition-all duration-300 hover:shadow-[var(--shadow-float)]">
+                                        <EmberPlayer
+                                            ref={audioPlayerRef}
+                                            audioId={audioId}
+                                            onTimeUpdate={handleTimeUpdate}
+                                            onPlayStateChange={setIsPlaying}
+                                        />
+                                    </div>
                                 </div>
 
                                 {/* Transcript */}

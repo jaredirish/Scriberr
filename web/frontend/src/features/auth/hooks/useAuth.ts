@@ -1,5 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useAuthStore } from '../store/authStore';
+import { refreshToken, navigateToHome } from '../../../lib/authHelpers';
+import '../../../lib/authTypes';
 
 export function useAuth() {
     const {
@@ -15,7 +17,6 @@ export function useAuth() {
     const isAuthenticated = !!token;
 
     const tokenCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
-    const fetchWrapperSetupRef = useRef(false);
 
     const getAuthHeaders = useCallback((): Record<string, string> => {
         if (token) {
@@ -46,12 +47,7 @@ export function useAuth() {
             },
         }).catch(() => { });
 
-        if (window.location.pathname !== "/") {
-            // Force navigation handled by RouterContext or window.location if critical
-            window.history.pushState({ route: { path: 'home' } }, "", "/");
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            window.dispatchEvent(new PopStateEvent('popstate', { state: { route: { path: 'home' } } as any }));
-        }
+        navigateToHome();
     }, [token, storeLogout]);
 
 
@@ -60,58 +56,17 @@ export function useAuth() {
         setRequiresRegistration(false);
     }, [setToken, setRequiresRegistration]);
 
-
-    const tryRefresh = useCallback(async (): Promise<string | null> => {
-        try {
-            const res = await fetch('/api/v1/auth/refresh', { method: 'POST' })
-            if (!res.ok) return null
-            const data = await res.json()
-            if (data?.token) {
-                login(data.token)
-                return data.token as string
-            }
-            return null
-        } catch {
-            return null
-        }
-    }, [login])
-
-
-    // Consolidated token management
     useEffect(() => {
-        if (!fetchWrapperSetupRef.current) {
-            const originalFetch = window.fetch.bind(window);
-            const wrappedFetch: typeof window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
-                let res = await originalFetch(input, init);
-                if (res.status === 401) {
-                    const newToken = await tryRefresh()
-                    if (newToken) {
-                        const newInit: RequestInit | undefined = init ? { ...init } : undefined
-                        if (newInit?.headers && typeof newInit.headers === 'object') {
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                            (newInit.headers as any)['Authorization'] = `Bearer ${newToken}`
-                        }
-                        res = await originalFetch(input, newInit)
-                        if (res.status !== 401) return res
-                    }
-                    logout()
-                }
-                return res;
-            };
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            window.fetch = wrappedFetch as any;
-            fetchWrapperSetupRef.current = true;
-            return () => { window.fetch = originalFetch; };
-        }
-
         if (tokenCheckIntervalRef.current) clearInterval(tokenCheckIntervalRef.current);
 
         if (token) {
             const checkTokenExpiry = async () => {
                 if (!token) return;
                 if (isTokenExpired(token)) {
-                    const newToken = await tryRefresh();
-                    if (!newToken) logout();
+                    const newToken = await refreshToken();
+                    if (!newToken) {
+                        logout();
+                    }
                 }
             };
             tokenCheckIntervalRef.current = setInterval(checkTokenExpiry, 60000);
@@ -121,26 +76,25 @@ export function useAuth() {
         return () => {
             if (tokenCheckIntervalRef.current) clearInterval(tokenCheckIntervalRef.current);
         };
-    }, [token, isTokenExpired, logout, tryRefresh]);
+    }, [token, isTokenExpired, logout]);
 
-    // Initial check (equivalent to old AuthProvider mount effect)
     useEffect(() => {
         const initializeAuth = async () => {
-            if (isInitialized) return; // Don't run if already initialized
+            if (isInitialized) return;
 
             try {
                 const response = await fetch("/api/v1/auth/registration-status");
                 if (response.ok) {
                     const data = await response.json();
-                    const regEnabled = typeof data.registration_enabled === 'boolean' ? data.registration_enabled : !!data.requiresRegistration;
+                    const regEnabled = typeof data.registration_enabled === 'boolean'
+                        ? data.registration_enabled
+                        : !!data.requiresRegistration;
                     setRequiresRegistration(regEnabled);
 
-                    if (!regEnabled) {
-                        // Check token validity if present
-                        if (token && isTokenExpired(token)) {
-                            // Try refresh or logout
-                            const Refreshed = await tryRefresh();
-                            if (!Refreshed) logout();
+                    if (!regEnabled && token && isTokenExpired(token)) {
+                        const newToken = await refreshToken();
+                        if (!newToken) {
+                            logout();
                         }
                     }
                 }
@@ -151,7 +105,7 @@ export function useAuth() {
             }
         };
         initializeAuth();
-    }, [isInitialized, setRequiresRegistration, setInitialized, token, isTokenExpired, tryRefresh, logout]);
+    }, [isInitialized, setRequiresRegistration, setInitialized, token, isTokenExpired, logout]);
 
     return {
         token,

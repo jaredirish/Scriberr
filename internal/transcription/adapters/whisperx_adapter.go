@@ -182,7 +182,7 @@ func NewWhisperXAdapter(envPath string) *WhisperXAdapter {
 			Type:        "string",
 			Required:    false,
 			Default:     nil,
-			Description: "HuggingFace token for diarization models",
+			Description: "HuggingFace token for diarization models (optional if HF_TOKEN env var is set)",
 			Group:       "advanced",
 		},
 
@@ -351,6 +351,10 @@ func (w *WhisperXAdapter) updateWhisperXDependencies(whisperxPath string) error 
 
 	content := string(data)
 	content = strings.ReplaceAll(content, "ctranslate2<4.5.0", "ctranslate2==4.6.0")
+
+	// torchcodec>=0.6.0 (upstream default) resolves to 0.10.0+ which requires PyTorch 2.9.
+	// Pin to 0.7.x which is compatible with the PyTorch 2.8.x used here.
+	content = strings.ReplaceAll(content, "torchcodec>=0.6.0", "torchcodec~=0.7.0")
 
 	if !strings.Contains(content, "yt-dlp") {
 		content = strings.ReplaceAll(content,
@@ -553,8 +557,12 @@ func (w *WhisperXAdapter) buildWhisperXArgs(input interfaces.AudioInput, params 
 	args = append(args, "--beam_size", strconv.Itoa(w.GetIntParameter(params, "beam_size")))
 	args = append(args, "--patience", fmt.Sprintf("%.2f", w.GetFloatParameter(params, "patience")))
 
-	// HuggingFace token
-	if hfToken := w.GetStringParameter(params, "hf_token"); hfToken != "" {
+	// HuggingFace token - use param first, then fall back to environment variable
+	hfToken := w.GetStringParameter(params, "hf_token")
+	if hfToken == "" {
+		hfToken = os.Getenv("HF_TOKEN")
+	}
+	if hfToken != "" {
 		args = append(args, "--hf_token", hfToken)
 	}
 
